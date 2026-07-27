@@ -1,0 +1,135 @@
+{
+  "dataset": "NSL-KDD",
+  "version": "1.1",
+  "description": "Semantic abstraction of NSL-KDD features observed in real SHAP explanations.",
+  "features": {
+    "count": {
+      "concept": "same_destination_connection_count",
+      "category": "short_window_traffic",
+      "definition": "Number of connections to the same destination host as the current connection during the previous two seconds.",
+      "soc_interpretation": "Measures the recent concentration of connections toward the same destination.",
+      "value_type": "count",
+      "source": "KDD Cup 1999 feature documentation"
+    },
+    "srv_count": {
+      "concept": "same_service_connection_count",
+      "category": "short_window_traffic",
+      "definition": "Number of connections to the same service as the current connection during the previous two seconds.",
+      "soc_interpretation": "Measures the recent concentration of connections toward the same network service.",
+      "value_type": "count",
+      "source": "KDD Cup 1999 feature documentation"
+    },
+    "dst_host_rerror_rate": {
+      "concept": "destination_rejection_error_rate",
+      "category": "host_based_traffic",
+      "definition": "Proportion of historical connections to the same destination host that contain rejection errors.",
+      "soc_interpretation": "Represents repeated rejected connection attempts involving the destination host.",
+      "value_type": "rate",
+      "source": "KDD Cup 1999 host-based traffic features"
+    },
+    "dst_host_diff_srv_rate": {
+      "concept": "destination_service_diversity",
+      "category": "host_based_traffic",
+      "definition": "Proportion of connections to different services among historical connections to the same destination host.",
+      "soc_interpretation": "Measures the diversity of services contacted on the destination host.",
+      "value_type": "rate",
+      "source": "KDD Cup 1999 host-based traffic features"
+    },
+    "diff_srv_rate": {
+      "concept": "short_window_service_diversity",
+      "category": "short_window_traffic",
+      "definition": "Proportion of connections to different services among recent connections to the same destination host.",
+      "soc_interpretation": "Measures rapid variation in the services contacted on a destination.",
+      "value_type": "rate",
+      "source": "KDD Cup 1999 feature documentation"
+    },
+    "dst_host_same_src_port_rate": {
+      "concept": "source_port_reuse_rate",
+      "category": "host_based_traffic",
+      "definition": "Proportion of historical connections to the destination host that use the same source port.",
+      "soc_interpretation": "Provides context about source-port reuse in connections involving the destination.",
+      "value_type": "rate",
+      "source": "KDD Cup 1999 host-based traffic features"
+    },
+    "logged_in": {
+      "concept": "authentication_state",
+      "category": "authentication",
+      "definition": "Indicates whether the connection completed a successful login.",
+      "soc_interpretation": "Provides authentication context for the analyzed connection.",
+      "value_type": "binary",
+      "source": "KDD Cup 1999 feature documentation"
+    },
+    "src_bytes": {
+      "concept": "outbound_transfer_volume",
+      "category": "connection_flow",
+      "definition": "Number of data bytes transferred from the source to the destination.",
+      "soc_interpretation": "Measures the volume of data sent by the source.",
+      "value_type": "count",
+      "source": "KDD Cup 1999 feature documentation"
+    },
+    "dst_bytes": {
+      "concept": "inbound_transfer_volume",
+      "category": "connection_flow",
+      "definition": "Number of data bytes transferred from the destination to the source.",
+      "soc_interpretation": "Measures the volume of data received from the destination.",
+      "value_type": "count",
+      "source": "KDD Cup 1999 feature documentation"
+    },
+    "flag_SF": {
+      "concept": "successful_connection_state",
+      "category": "connection_state",
+      "definition": "One-hot encoded representation indicating whether the original connection flag is SF.",
+      "soc_interpretation": "Indicates the presence or absence of a normally established and completed connection state.",
+      "value_type": "binary",
+      "source": "Derived from the one-hot encoding of the KDD connection flag"
+    },
+    "protocol_type_icmp": {
+      "concept": "icmp_protocol_usage",
+      "category": "protocol",
+      "definition": "Indicates whether the analyzed connection uses the ICMP protocol.",
+      "soc_interpretation": "Provides protocol context associated with ICMP traffic, which may be used during host discovery when combined with other evidence.",
+      "value_type": "binary",
+      "source": "Derived from the one-hot encoding of the NSL-KDD protocol_type feature"
+    },
+    "service_eco_i": {
+      "concept": "icmp_echo_service_usage",
+      "category": "service",
+      "definition": "Indicates whether the connection uses the eco_i service associated with ICMP echo traffic.",
+      "soc_interpretation": "Represents ICMP echo activity that may contribute to evidence of host discovery when supported by additional observations.",
+      "value_type": "binary",
+      "source": "Derived from the one-hot encoding of the NSL-KDD service feature"
+    },
+    "dst_host_srv_diff_host_rate": {
+      "concept": "same_service_multi_host_rate",
+      "category": "host_based_traffic",
+      "definition": "Proportion of connections to the same service that involve different destination hosts.",
+      "soc_interpretation": "Measures whether a service is contacted across multiple destination hosts, which may support evidence of distributed exploration.",
+      "value_type": "rate",
+      "source": "KDD Cup 1999 host-based traffic features"
+    },
+    "dst_host_serror_rate": {
+      "concept": "destination_syn_error_rate",
+      "category": "host_based_traffic",
+      "definition": "Proportion of historical connections to the destination host that contain SYN errors.",
+      "soc_interpretation": "Measures unsuccessful SYN-based connection activity involving the destination host.",
+      "value_type": "rate",
+      "source": "KDD Cup 1999 host-based traffic features"
+    },
+    "service_ftp_data": {
+      "concept": "ftp_data_service_usage",
+      "category": "service",
+      "definition": "Indicates whether the connection uses the FTP-DATA service.",
+      "soc_interpretation": "Provides service context about the use or absence of an FTP data-channel connection.",
+      "value_type": "binary",
+      "source": "Derived from the one-hot encoding of the NSL-KDD service feature"
+    },
+    "protocol_type_tcp": {
+      "concept": "tcp_protocol_usage",
+      "category": "protocol",
+      "definition": "Indicates whether the analyzed connection uses the TCP protocol.",
+      "soc_interpretation": "Provides protocol context about the presence or absence of TCP traffic.",
+      "value_type": "binary",
+      "source": "Derived from the one-hot encoding of the NSL-KDD protocol_type feature"
+    }
+  }
+}
