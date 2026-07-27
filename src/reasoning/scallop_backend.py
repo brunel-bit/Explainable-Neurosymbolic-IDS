@@ -59,13 +59,7 @@ class ScallopReasoningBackend(ReasoningBackend):
             supporting_condition_facts,
         ) = self._build_pattern_facts(patterns)
 
-        print("\n========== DEBUG ==========")
-        print(f"Nombre de patterns : {len(patterns)}")
-        print(f"Pattern facts : {len(pattern_facts)}")
-        print(f"Required facts : {len(required_condition_facts)}")
-        print(f"Supporting facts : {len(supporting_condition_facts)}")
-        print(f"Action facts : {len(action_facts)}")
-        print("===========================\n")
+        # Bloc de debug désactivé
 
         if action_facts:
             ctx.add_facts("semantic_action", action_facts)
