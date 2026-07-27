@@ -1,0 +1,324 @@
+{
+  "input_file": "data/mitre_real/enterprise-attack.json",
+  "fallback_input_file": "data/mitre_real/enterprise-attack_sample.json",
+  "strict_input_required": false,
+  "stix_reader": {
+    "parse_all_objects": true,
+    "parse_all_properties": true,
+    "keep_unprojected_objects": true,
+    "max_objects": null
+  },
+  "filters": {
+    "domains": ["enterprise-attack"],
+    "include_revoked": false,
+    "include_deprecated": true,
+    "include_subtechniques": true
+  },
+  "projection": {
+    "enabled": true,
+    "allowed_object_types": [
+      "attack-pattern",
+      "x-mitre-tactic",
+      "intrusion-set",
+      "tool",
+      "malware",
+      "campaign",
+      "course-of-action",
+      "x-mitre-data-source",
+      "x-mitre-data-component",
+      "relationship"
+    ],
+    "allowed_relationship_types": [
+      "uses",
+      "mitigates",
+      "subtechnique-of",
+      "revoked-by",
+      "detects",
+      "attributed-to",
+      "targets",
+      "compromises",
+      "related-to",
+      "duplicate-of",
+      "derived-from",
+      "kill_chain_phase"
+    ]
+  },
+  "threat_action_extraction": {
+    "enabled": true,
+    "use_attack_pattern_description": true,
+    "use_relationship_descriptions": true,
+    "min_score": 1.0,
+    "max_actions_per_technique": 14,
+    "export_path_raw": "exports/threat_actions_generated_raw.json",
+    "export_path_final": "exports/threat_actions_generated_final.json",
+    "verb_lexicon": [
+      "dump",
+      "access",
+      "execute",
+      "run",
+      "download",
+      "scan",
+      "read",
+      "write",
+      "collect",
+      "steal",
+      "create",
+      "delete",
+      "modify",
+      "query",
+      "discover",
+      "inject",
+      "compress",
+      "archive",
+      "monitor",
+      "redirect",
+      "overwrite",
+      "schedule",
+      "launch",
+      "identify"
+    ]
+  },
+  "semantic_mapping": {
+    "export_path": "exports/semantic_mapping_result.json",
+    "top_k_candidates": 5,
+    "label_to_mitre_hints": {
+      "credential_access": ["T1003"],
+      "execution": ["T1059.001", "T1053.005"],
+      "discovery": ["T1033"],
+      "collection": ["T1560.001"],
+      "defense_evasion": ["T1055.011"]
+    },
+    "feature_pattern_rules": [
+      {
+        "contains_any": [
+          "lsass",
+          "mimikatz",
+          "sekurlsa",
+          "logonpasswords",
+          "sam"
+        ],
+        "verb": "dump",
+        "object": "credentials",
+        "weight": 3.0,
+        "tag": "credential_dumping"
+      },
+      {
+        "contains_any": ["lsass"],
+        "verb": "access",
+        "object": "lsass memory",
+        "weight": 2.0,
+        "tag": "lsass"
+      },
+      {
+        "contains_any": ["powershell", "pwsh", "script block"],
+        "verb": "execute",
+        "object": "powershell scripts",
+        "weight": 2.5,
+        "tag": "powershell"
+      },
+      {
+        "contains_any": ["schtasks", "task scheduler", "scheduled task"],
+        "verb": "create",
+        "object": "scheduled task",
+        "weight": 2.5,
+        "tag": "scheduled_task"
+      },
+      {
+        "contains_any": [
+          "archive",
+          "zip",
+          "rar",
+          "7zip",
+          "gzip",
+          "exfiltration"
+        ],
+        "verb": "archive",
+        "object": "data exfiltration",
+        "weight": 2.5,
+        "tag": "archive"
+      },
+      {
+        "contains_any": ["whoami", "username", "logged-on", "logged on"],
+        "verb": "discover",
+        "object": "username",
+        "weight": 2.0,
+        "tag": "username"
+      },
+      {
+        "contains_any": [
+          "extra window memory",
+          "shell_traywnd",
+          "rop",
+          "thread injection"
+        ],
+        "verb": "inject",
+        "object": "malicious code",
+        "weight": 2.0,
+        "tag": "ewm"
+      },
+      {
+        "contains_any": ["cmd.exe", "command shell", "cmd "],
+        "verb": "execute",
+        "object": "command shell",
+        "weight": 2.2,
+        "tag": "command_shell"
+      }
+    ]
+  },
+  "logic_validation": {
+    "export_path": "exports/logic_validation_result.json",
+    "top_match_threshold": 10.0,
+    "margin_threshold": 10.0,
+    "expected_family_by_label": {
+      "credential_access": ["T1003"],
+      "execution": ["T1059", "T1053"],
+      "discovery": ["T1033"],
+      "collection": ["T1560"],
+      "defense_evasion": ["T1055"]
+    }
+  },
+  "scallop_layer": {
+    "export_path": "exports/scallop_layer_result.json",
+    "scallop_program_path": "scallop/mitre_validation_etape14.scl",
+    "top_k_candidates": 5
+  },
+  "advanced_logic": {
+    "export_path": "exports/advanced_logic_result.json",
+    "ambiguity_margin_threshold": 20.0,
+    "contradiction_penalty": 15.0,
+    "multi_action_bonus": 5.0
+  },
+  "composition_logic": {
+    "export_path": "exports/composition_logic_result.json",
+    "max_scenario_size": 3,
+    "top_k_scenarios": 10,
+    "coverage_bonus": 20.0,
+    "family_bonus": 10.0,
+    "redundancy_penalty": 2.0
+  },
+  "scenario_structured_logic": {
+    "export_path": "exports/scenario_structured_logic_result.json",
+    "top_k_scenarios": 5,
+    "scenario_rules": [
+      {
+        "id": "execution_chain",
+        "requires_actions": [
+          {
+            "verb": "create",
+            "object": "scheduled task"
+          },
+          {
+            "verb": "execute",
+            "object": "powershell scripts"
+          }
+        ],
+        "requires_families_any_order": ["T1053", "T1059"],
+        "bonus": 40.0,
+        "description": "Scheduled Task déclenche l'exécution d'un script PowerShell."
+      },
+      {
+        "id": "credential_dump_chain",
+        "requires_actions": [
+          {
+            "verb": "dump",
+            "object": "credentials"
+          },
+          {
+            "verb": "access",
+            "object": "lsass memory"
+          }
+        ],
+        "requires_families_any_order": ["T1003"],
+        "bonus": 35.0,
+        "description": "Le scénario correspond à un credential dumping centré sur LSASS."
+      }
+    ]
+  },
+  "scenario_relations_logic": {
+    "export_path": "exports/scenario_relations_result.json",
+    "top_k_scenarios": 10,
+    "relation_rules": [
+      {
+        "id": "task_triggers_powershell",
+        "requires_actions": [
+          {
+            "verb": "create",
+            "object": "scheduled task"
+          },
+          {
+            "verb": "execute",
+            "object": "powershell scripts"
+          }
+        ],
+        "requires_technique_ids_any_order": ["T1053.005", "T1059.001"],
+        "from_technique_id": "T1053.005",
+        "to_technique_id": "T1059.001",
+        "from_family": "T1053",
+        "to_family": "T1059",
+        "relation": "triggers",
+        "bonus": 30.0,
+        "description": "Une tâche planifiée déclenche l'exécution PowerShell."
+      },
+      {
+        "id": "powershell_invokes_cmd",
+        "requires_actions": [
+          {
+            "verb": "execute",
+            "object": "powershell scripts"
+          },
+          {
+            "verb": "execute",
+            "object": "command shell"
+          }
+        ],
+        "requires_technique_ids_any_order": ["T1059.001", "T1059.003"],
+        "from_technique_id": "T1059.001",
+        "to_technique_id": "T1059.003",
+        "from_family": "T1059",
+        "to_family": "T1059",
+        "relation": "invokes",
+        "bonus": 25.0,
+        "description": "PowerShell enchaîne vers une exécution via Command Shell."
+      }
+    ]
+  },
+  "causal_chain_logic": {
+    "export_path": "exports/causal_chain_result.json",
+    "top_k_chains": 5,
+    "chain_rules": [
+      {
+        "id": "scheduled_task_to_powershell_to_cmd",
+        "required_relations": [
+          "task_triggers_powershell",
+          "powershell_invokes_cmd"
+        ],
+        "bonus": 60.0,
+        "description": "Chaîne multi-étapes: tâche planifiée -> PowerShell -> Command Shell.",
+        "chain_edges": [
+          {
+            "from_technique_id": "T1053.005",
+            "relation": "triggers",
+            "to_technique_id": "T1059.001"
+          },
+          {
+            "from_technique_id": "T1059.001",
+            "relation": "invokes",
+            "to_technique_id": "T1059.003"
+          }
+        ]
+      }
+    ]
+  },
+  "scenario_scallop_layer_18": {
+    "export_path": "exports/scenario_scallop_layer_etape18_result.json",
+    "top_k_scenarios": 5,
+    "scallop_program_path": "scallop/scenario_validation_etape18.scl"
+  },
+  "scallop_native_logic": {
+    "enabled": true,
+    "facts_export_path": "exports/scallop_native_facts_etape18a.json",
+    "result_export_path": "exports/scallop_native_result_etape18a.json",
+    "scallop_program_path": "scallop/scenario_validation_etape18a.scl",
+    "scallop_command": ""
+  }
+}

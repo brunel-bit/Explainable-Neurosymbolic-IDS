@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "description": "Rule-based mapping from behavioral patterns to MITRE ATT&CK Enterprise techniques.",
+  "source": {
+    "framework": "MITRE ATT&CK Enterprise",
+    "mapping_type": "expert_rule_based",
+    "last_verified": "2026-07-26"
+  },
+  "mappings": [
+    {
+      "mapping_id": "MAP-DOS-001",
+      "pattern_id": "BP-DOS-001",
+      "technique_id": "T1498",
+      "technique_name": "Network Denial of Service",
+      "tactic_id": "TA0040",
+      "tactic_name": "Impact",
+      "granularity": "technique",
+      "base_confidence": 0.85,
+      "mapping_status": "candidate",
+      "justification": "The behavioral pattern represents elevated connection activity toward a destination combined with a high connection rejection rate, which is consistent with network-level denial-of-service behavior.",
+      "supporting_behavior": [
+        "high destination connection activity",
+        "high connection rejection rate",
+        "availability disruption"
+      ],
+      "excluded_subtechniques": [
+        {
+          "technique_id": "T1498.001",
+          "technique_name": "Direct Network Flood",
+          "reason": "The current NSL-KDD evidence does not directly establish a high-volume direct packet flood."
+        },
+        {
+          "technique_id": "T1498.002",
+          "technique_name": "Reflection Amplification",
+          "reason": "The current evidence does not contain reflector, amplification, or source-address spoofing information."
+        }
+      ],
+      "required_additional_context": [
+        "packet or byte rate",
+        "number of distinct sources",
+        "source-address spoofing evidence",
+        "amplification protocol information"
+      ]
+    },
+    {
+      "mapping_id": "MAP-SCAN-001",
+      "pattern_id": "BP-SCAN-001",
+      "technique_id": "T1046",
+      "technique_name": "Network Service Discovery",
+      "tactic_id": "TA0007",
+      "tactic_name": "Discovery",
+      "granularity": "technique",
+      "base_confidence": 0.8,
+      "mapping_status": "candidate",
+      "justification": "The behavioral pattern represents repeated exploration of multiple network services, which is consistent with network service discovery.",
+      "supporting_behavior": [
+        "high destination service diversity",
+        "high short-window service variation",
+        "repeated connection activity"
+      ],
+      "excluded_subtechniques": [],
+      "required_additional_context": [
+        "destination ports",
+        "destination hosts",
+        "scan time window",
+        "known authorized scanner context"
+      ]
+    }
+  ]
+}

@@ -1,23 +1,32 @@
-# Python virtual environment
+# Environnement Python
 .venv/
 venv/
-
-# IDE
-.idea/
-.vscode/
-
-# Python cache
 __pycache__/
 *.py[cod]
 
 # macOS
 .DS_Store
 
-# Environment variables
-.env
+# IDE
+.idea/
+.vscode/
 
-# Generated outputs
+# Données volumineuses
+data/raw/
+datasets/
+*.csv
+*.parquet
+*.pkl
+*.joblib
+
+# Modèles et sorties reproductibles
+models/
 outputs/
 
-# Jupyter
-.ipynb_checkpoints/
+# MITRE ATT&CK complet
+data/mitre/enterprise-attack.json
+
+# Secrets
+.env
+*.key
+*.pem
