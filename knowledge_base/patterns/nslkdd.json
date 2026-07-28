@@ -1,0 +1,143 @@
+{
+  "version": "1.1",
+  "description": "Behavioral patterns inferred from NSL-KDD contextual semantic actions.",
+  "patterns": [
+    {
+      "pattern_id": "BP-DOS-001",
+      "name": "destination_service_disruption_pattern",
+      "description": "High connection activity toward a destination combined with a high rate of rejected connections.",
+      "required_conditions": [
+        {
+          "verb": "increase",
+          "object": "destination_connection_activity",
+          "state": "high"
+        },
+        {
+          "verb": "increase",
+          "object": "connection_rejections",
+          "state": "high"
+        }
+      ],
+      "supporting_conditions": [
+        {
+          "verb": "observe",
+          "object": "authentication_absence",
+          "state": "not_authenticated"
+        },
+        {
+          "verb": "observe",
+          "object": "successful_connection_state_absence",
+          "state": "sf_not_observed"
+        },
+        {
+          "verb": "observe",
+          "object": "no_outbound_data",
+          "state": "absent"
+        },
+        {
+          "verb": "observe",
+          "object": "no_inbound_data",
+          "state": "absent"
+        },
+        {
+          "verb": "observe",
+          "object": "destination_service_diversity",
+          "state": "low"
+        }
+      ],
+      "minimum_supporting_conditions": 1,
+      "associated_labels": [
+        "DoS"
+      ],
+      "category": "availability_disruption",
+      "severity": "high"
+    },
+    {
+      "pattern_id": "BP-SCAN-001",
+      "name": "icmp_host_exploration_pattern",
+      "description": "ICMP echo activity associated with contextual evidence of repeated or distributed host exploration.",
+      "required_conditions": [
+        {
+          "verb": "observe",
+          "object": "icmp_protocol_activity",
+          "state": "present"
+        },
+        {
+          "verb": "observe",
+          "object": "icmp_echo_activity",
+          "state": "present"
+        }
+      ],
+      "supporting_conditions": [
+        {
+          "verb": "increase",
+          "object": "source_port_reuse",
+          "state": "high"
+        },
+        {
+          "verb": "increase",
+          "object": "multi_host_service_activity",
+          "state": "elevated"
+        },
+        {
+          "verb": "increase",
+          "object": "destination_service_diversity",
+          "state": "high"
+        },
+        {
+          "verb": "increase",
+          "object": "service_variation",
+          "state": "high"
+        },
+        {
+          "verb": "increase",
+          "object": "syn_error_activity",
+          "state": "high"
+        }
+      ],
+      "minimum_supporting_conditions": 1,
+      "associated_labels": [
+        "Probe"
+      ],
+      "category": "network_discovery",
+      "severity": "medium"
+    },
+    {
+      "pattern_id": "BP-AUTH-001",
+      "name": "authenticated_network_activity_pattern",
+      "description": "Network activity occurring after a successful authentication state.",
+      "required_conditions": [
+        {
+          "verb": "observe",
+          "object": "successful_authentication",
+          "state": "authenticated"
+        }
+      ],
+      "supporting_conditions": [
+        {
+          "verb": "transfer",
+          "object": "outbound_data",
+          "state": "present"
+        },
+        {
+          "verb": "transfer",
+          "object": "inbound_data",
+          "state": "present"
+        },
+        {
+          "verb": "observe",
+          "object": "successful_connection",
+          "state": "successful"
+        }
+      ],
+      "minimum_supporting_conditions": 1,
+      "associated_labels": [
+        "Normal",
+        "R2L",
+        "U2R"
+      ],
+      "category": "authenticated_activity",
+      "severity": "informational"
+    }
+  ]
+}

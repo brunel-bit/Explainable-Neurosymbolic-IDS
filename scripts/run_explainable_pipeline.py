@@ -6,16 +6,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from src.explanation.proof_builder import (
-    build_explainable_proof,
-)
-from src.reasoning.mitre_mapper import (
-    map_patterns_to_mitre,
-)
-from src.reasoning.pattern_engine import (
-    get_activated_patterns,
-    infer_behavior_patterns,
-)
+from src.explanation.proof_builder import build_explainable_proof
+from src.mitre.mapper import MitreMapper
+from src.reasoning.attack_chain_builder import AttackChainBuilder
+from src.reasoning.scallop_backend import ScallopReasoningBackend
 from src.semantic.mapper import (
     load_xai_json,
     semantic_concepts_to_actions,
@@ -49,15 +43,9 @@ def save_json(
     output_path: Path,
 ) -> None:
     """Enregistre un objet JSON en créant les dossiers nécessaires."""
-    output_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_path.open(
-        "w",
-        encoding="utf-8",
-    ) as file:
+    with output_path.open("w", encoding="utf-8") as file:
         json.dump(
             payload,
             file,
@@ -66,11 +54,19 @@ def save_json(
         )
 
 
+def safe_float(
+    value: Any,
+    default: float = 0.0,
+) -> float:
+    """Convertit une valeur en float sans interrompre le pipeline."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def sanitize_case_id(case_id: str) -> str:
-    """
-    Nettoie l’identifiant du cas pour son utilisation dans les noms
-    de fichiers.
-    """
+    """Nettoie un identifiant destiné aux noms de fichiers."""
     sanitized = re.sub(
         r"[^a-zA-Z0-9_-]+",
         "_",
@@ -85,12 +81,8 @@ def sanitize_case_id(case_id: str) -> str:
     return sanitized
 
 
-def infer_case_id(
-    input_path: Path,
-) -> str:
-    """
-    Déduit l’identifiant depuis un fichier comme input_case_0.json.
-    """
+def infer_case_id(input_path: Path) -> str:
+    """Déduit l’identifiant depuis un fichier comme input_probe_01.json."""
     stem = input_path.stem
 
     if stem.startswith("input_"):
@@ -99,9 +91,7 @@ def infer_case_id(
     return sanitize_case_id(stem)
 
 
-def build_output_paths(
-    case_id: str,
-) -> dict[str, Path]:
+def build_output_paths(case_id: str) -> dict[str, Path]:
     """Construit les chemins de sortie du pipeline."""
     return {
         "concepts": (
@@ -116,17 +106,23 @@ def build_output_paths(
             / "semantic"
             / f"actions_{case_id}.json"
         ),
-        "patterns": (
+        "reasoning": (
             PROJECT_ROOT
             / "outputs"
             / "reasoning"
-            / f"patterns_{case_id}.json"
+            / f"reasoning_{case_id}.json"
         ),
         "mitre": (
             PROJECT_ROOT
             / "outputs"
             / "mitre"
             / f"mitre_{case_id}.json"
+        ),
+        "attack_chain": (
+            PROJECT_ROOT
+            / "outputs"
+            / "reasoning"
+            / f"attack_chain_{case_id}.json"
         ),
         "proof": (
             PROJECT_ROOT
@@ -141,7 +137,7 @@ def build_concepts_result(
     xai_payload: dict[str, Any],
     concepts_config: dict[str, Any],
 ) -> dict[str, Any]:
-    """Exécute la couche Feature → Concept."""
+    """Exécute la transformation Feature → Concept."""
     concepts = xai_to_semantic_concepts(
         xai_payload=xai_payload,
         concepts_config=concepts_config,
@@ -152,14 +148,10 @@ def build_concepts_result(
         for concept in concepts
         if concept.get("mapped", False)
     )
-
     total_count = len(concepts)
 
     return {
-        "prediction": xai_payload.get(
-            "prediction",
-            {},
-        ),
+        "prediction": xai_payload.get("prediction", {}),
         "dataset": concepts_config.get("dataset"),
         "semantic_concepts": concepts,
         "coverage": {
@@ -179,7 +171,7 @@ def build_actions_result(
     concepts: list[dict[str, Any]],
     actions_config: dict[str, Any],
 ) -> dict[str, Any]:
-    """Exécute la couche Concept → Action."""
+    """Exécute la transformation Concept → Action."""
     actions = semantic_concepts_to_actions(
         semantic_concepts=concepts,
         actions_config=actions_config,
@@ -195,10 +187,7 @@ def build_actions_result(
             "supporting_actions": sum(
                 1
                 for action in actions
-                if action.get(
-                    "supports_prediction",
-                    False,
-                )
+                if action.get("supports_prediction", False)
             ),
             "opposing_actions": sum(
                 1
@@ -210,76 +199,156 @@ def build_actions_result(
     }
 
 
-def build_patterns_result(
+def normalize_reasoning_result(
+    reasoning_result: dict[str, Any],
+    *,
+    case_id: str,
     prediction: dict[str, Any],
-    actions: list[dict[str, Any]],
-    patterns_config: dict[str, Any],
+    semantic_action_count: int,
 ) -> dict[str, Any]:
-    """Exécute la couche Action → Motif comportemental."""
-    prediction_label = prediction.get("label")
-
-    evaluated_patterns = infer_behavior_patterns(
-        semantic_actions=actions,
-        patterns_config=patterns_config,
-        prediction_label=prediction_label,
+    """Ajoute les métadonnées utiles sans modifier la trace Scallop."""
+    activated_patterns = reasoning_result.get(
+        "activated_patterns",
+        [],
     )
-
-    activated_patterns = get_activated_patterns(
-        evaluated_patterns
+    derived_relations = reasoning_result.get(
+        "derived_relations",
+        [],
     )
+    trace = reasoning_result.get("trace", {})
 
     return {
+        **reasoning_result,
+        "case_id": reasoning_result.get("case_id", case_id),
         "prediction": prediction,
-        "semantic_action_count": len(actions),
-        "evaluated_patterns": evaluated_patterns,
-        "activated_patterns": activated_patterns,
+        "semantic_action_count": semantic_action_count,
         "summary": {
-            "evaluated_pattern_count": len(
-                evaluated_patterns
+            "backend": reasoning_result.get(
+                "backend",
+                trace.get("engine", "Scallop"),
             ),
-            "activated_pattern_count": len(
-                activated_patterns
+            "evaluated_pattern_count": trace.get(
+                "evaluated_patterns",
+                0,
             ),
+            "activated_pattern_count": len(activated_patterns),
+            "derived_relation_count": len(derived_relations),
         },
     }
 
 
+def run_scallop_reasoning(
+    *,
+    case_id: str,
+    prediction: dict[str, Any],
+    semantic_actions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Exécute Action → Motif avec le backend Scallop."""
+    backend = ScallopReasoningBackend()
+
+    reasoning_result = backend.reason(
+        case_id=case_id,
+        actions=semantic_actions,
+        patterns=[],
+        context={
+            "prediction": prediction,
+        },
+)
+
+    if not isinstance(reasoning_result, dict):
+        raise TypeError(
+            "ScallopReasoningBackend.reason() doit retourner un dictionnaire."
+        )
+
+    return normalize_reasoning_result(
+        reasoning_result,
+        case_id=case_id,
+        prediction=prediction,
+        semantic_action_count=len(semantic_actions),
+    )
+
+
 def build_mitre_result(
+    *,
     prediction: dict[str, Any],
     activated_patterns: list[dict[str, Any]],
-    mitre_config: dict[str, Any],
 ) -> dict[str, Any]:
-    """Exécute la couche Motif → MITRE ATT&CK."""
-    mapping_result = map_patterns_to_mitre(
-        activated_patterns=activated_patterns,
-        mitre_config=mitre_config,
+    """Exécute Motif → MITRE ATT&CK avec le mapper final."""
+    mapper = MitreMapper()
+    mitre_candidates = mapper.map_patterns(activated_patterns)
+
+    if not isinstance(mitre_candidates, list):
+        raise TypeError(
+            "MitreMapper.map_patterns() doit retourner une liste."
+        )
+
+    pattern_names = {
+        pattern.get("pattern_id"): (
+            pattern.get("name")
+            or pattern.get("pattern_name")
+            or "motif non nommé"
+        )
+        for pattern in activated_patterns
+        if pattern.get("pattern_id")
+    }
+
+    for candidate in mitre_candidates:
+        pattern_id = candidate.get("pattern_id")
+
+        if not candidate.get("pattern_name"):
+            candidate["pattern_name"] = pattern_names.get(
+                pattern_id,
+                "motif non nommé",
+            )
+
+    
+
+    mapped_count = sum(
+        1
+        for candidate in mitre_candidates
+        if candidate.get("mapping_status")
+        not in {None, "unmapped"}
     )
 
     return {
         "prediction": prediction,
-        "activated_patterns": [
-            {
-                "pattern_id": pattern.get(
-                    "pattern_id"
-                ),
-                "name": pattern.get("name"),
-                "category": pattern.get("category"),
-                "severity": pattern.get("severity"),
-                "total_evidence_weight": pattern.get(
-                    "total_evidence_weight"
-                ),
-            }
-            for pattern in activated_patterns
-        ],
-        **mapping_result,
-        "metadata": {
-            "mapping_version": mitre_config.get(
-                "version"
-            ),
-            "mapping_source": mitre_config.get(
-                "source",
-                {},
-            ),
+        "activated_patterns": activated_patterns,
+        "mitre_candidates": mitre_candidates,
+        "summary": {
+            "activated_pattern_count": len(activated_patterns),
+            "candidate_count": len(mitre_candidates),
+            "mapped_candidate_count": mapped_count,
+        },
+    }
+
+
+def build_attack_chain_result(
+    mitre_candidates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Ordonne les candidats selon les tactiques MITRE ATT&CK."""
+    builder = AttackChainBuilder()
+    attack_chain = builder.build(mitre_candidates)
+
+    if not isinstance(attack_chain, list):
+        raise TypeError(
+            "AttackChainBuilder.build() doit retourner une liste."
+        )
+
+    return {
+        "attack_chain": attack_chain,
+        "summary": {
+            "step_count": len(attack_chain),
+            "is_multistage": len(attack_chain) > 1,
+            "technique_ids": [
+                step.get("technique_id")
+                for step in attack_chain
+                if step.get("technique_id")
+            ],
+            "tactics": [
+                step.get("tactic")
+                for step in attack_chain
+                if step.get("tactic")
+            ],
         },
     }
 
@@ -288,14 +357,18 @@ def run_pipeline(
     input_path: Path,
     case_id: str,
 ) -> dict[str, Any]:
-    """Exécute toutes les couches du pipeline explicable."""
+    """
+    Exécute le pipeline explicable final :
+
+    XAI/COMAT → Concepts → Actions → Scallop → MITRE ATT&CK
+    → Chaîne d’attaque → Preuve E=<O,R,J>.
+    """
     concepts_config_path = (
         PROJECT_ROOT
         / "config"
         / "semantic"
         / "concepts_nslkdd.json"
     )
-
     actions_config_path = (
         PROJECT_ROOT
         / "config"
@@ -303,105 +376,57 @@ def run_pipeline(
         / "actions_nslkdd.json"
     )
 
-    patterns_config_path = (
-        PROJECT_ROOT
-        / "config"
-        / "reasoning"
-        / "behavior_patterns_nslkdd.json"
-    )
-
-    mitre_config_path = (
-        PROJECT_ROOT
-        / "config"
-        / "mitre"
-        / "pattern_to_mitre.json"
-    )
-
     xai_payload = load_xai_json(input_path)
-    concepts_config = load_json(
-        concepts_config_path
-    )
-    actions_config = load_json(
-        actions_config_path
-    )
-    patterns_config = load_json(
-        patterns_config_path
-    )
-    mitre_config = load_json(
-        mitre_config_path
-    )
-
+    concepts_config = load_json(concepts_config_path)
+    actions_config = load_json(actions_config_path)
     output_paths = build_output_paths(case_id)
 
     concepts_result = build_concepts_result(
         xai_payload=xai_payload,
         concepts_config=concepts_config,
     )
-
-    save_json(
-        concepts_result,
-        output_paths["concepts"],
-    )
+    save_json(concepts_result, output_paths["concepts"])
 
     actions_result = build_actions_result(
         prediction=concepts_result["prediction"],
-        concepts=concepts_result[
-            "semantic_concepts"
-        ],
+        concepts=concepts_result["semantic_concepts"],
         actions_config=actions_config,
     )
+    save_json(actions_result, output_paths["actions"])
 
-    save_json(
-        actions_result,
-        output_paths["actions"],
-    )
-
-    patterns_result = build_patterns_result(
+    reasoning_result = run_scallop_reasoning(
+        case_id=case_id,
         prediction=actions_result["prediction"],
-        actions=actions_result[
-            "semantic_actions"
-        ],
-        patterns_config=patterns_config,
+        semantic_actions=actions_result["semantic_actions"],
     )
-
-    save_json(
-        patterns_result,
-        output_paths["patterns"],
-    )
+    save_json(reasoning_result, output_paths["reasoning"])
 
     mitre_result = build_mitre_result(
-        prediction=patterns_result["prediction"],
-        activated_patterns=patterns_result[
-            "activated_patterns"
-        ],
-        mitre_config=mitre_config,
+        prediction=actions_result["prediction"],
+        activated_patterns=reasoning_result["activated_patterns"],
     )
+    save_json(mitre_result, output_paths["mitre"])
 
+    attack_chain_result = build_attack_chain_result(
+        mitre_result["mitre_candidates"]
+    )
     save_json(
-        mitre_result,
-        output_paths["mitre"],
+        attack_chain_result,
+        output_paths["attack_chain"],
     )
 
     proof_result = build_explainable_proof(
-        prediction=mitre_result["prediction"],
-        mitre_candidates=mitre_result[
-            "mitre_candidates"
-        ],
+        case_id=case_id,
+        prediction=actions_result["prediction"],
+        semantic_actions=actions_result["semantic_actions"],
+        reasoning_result=reasoning_result,
+        mitre_candidates=mitre_result["mitre_candidates"],
+        attack_chain=attack_chain_result["attack_chain"],
     )
-
-    proof_result["proof_id"] = (
-        f"E-{case_id.upper()}"
-    )
-
-    proof_result["case_id"] = case_id
     proof_result["source_xai_file"] = str(
         input_path.resolve()
     )
-
-    save_json(
-        proof_result,
-        output_paths["proof"],
-    )
+    save_json(proof_result, output_paths["proof"])
 
     return {
         "case_id": case_id,
@@ -409,8 +434,9 @@ def run_pipeline(
         "output_paths": output_paths,
         "concepts_result": concepts_result,
         "actions_result": actions_result,
-        "patterns_result": patterns_result,
+        "reasoning_result": reasoning_result,
         "mitre_result": mitre_result,
+        "attack_chain_result": attack_chain_result,
         "proof_result": proof_result,
     }
 
@@ -418,95 +444,88 @@ def run_pipeline(
 def print_summary(
     pipeline_result: dict[str, Any],
 ) -> None:
-    """Affiche une synthèse compacte du pipeline."""
+    """Affiche une synthèse SOC compacte du pipeline."""
     case_id = pipeline_result["case_id"]
+    concepts_result = pipeline_result["concepts_result"]
+    actions_result = pipeline_result["actions_result"]
+    reasoning_result = pipeline_result["reasoning_result"]
+    mitre_result = pipeline_result["mitre_result"]
+    attack_chain_result = pipeline_result[
+        "attack_chain_result"
+    ]
+    proof_result = pipeline_result["proof_result"]
 
-    concepts_result = pipeline_result[
-        "concepts_result"
-    ]
-    actions_result = pipeline_result[
-        "actions_result"
-    ]
-    patterns_result = pipeline_result[
-        "patterns_result"
-    ]
-    mitre_result = pipeline_result[
-        "mitre_result"
-    ]
-    proof_result = pipeline_result[
-        "proof_result"
-    ]
-
-    prediction = concepts_result.get(
-        "prediction",
-        {},
+    prediction = concepts_result.get("prediction", {})
+    probability = safe_float(
+        prediction.get("probability")
     )
+    conclusion = proof_result.get("C_conclusion", {})
+    audit = proof_result.get("audit", {})
 
-    probability = float(
-        prediction.get("probability", 0.0)
-    )
-
-    print(
-        "=== Pipeline explicable complet ==="
-    )
+    print("=== Pipeline neurosymbolique explicable ===")
     print(f"Cas         : {case_id}")
     print(
-        f"Prédiction  : "
-        f"{prediction.get('label')} "
+        f"Prédiction  : {prediction.get('label')} "
         f"(p={probability:.4f})"
     )
 
     coverage = concepts_result["coverage"]
-
     print(
-        f"Concepts    : "
-        f"{coverage['mapped_features']}/"
+        f"Concepts    : {coverage['mapped_features']}/"
         f"{coverage['total_features']} "
         f"({coverage['mapping_rate']:.0%})"
     )
-
     print(
         f"Actions     : "
         f"{actions_result['summary']['action_count']}"
     )
-
     print(
-        f"Motifs      : "
-        f"{patterns_result['summary']['activated_pattern_count']} "
-        f"activé(s)"
+        f"Scallop     : "
+        f"{reasoning_result['summary']['activated_pattern_count']} "
+        f"motif(s) activé(s)"
     )
-
     print(
         f"MITRE       : "
         f"{mitre_result['summary']['candidate_count']} "
         f"candidat(s)"
     )
-
     print(
-        f"Traçable    : "
-        f"{proof_result['audit']['traceable']}"
+        f"Chaîne      : "
+        f"{attack_chain_result['summary']['step_count']} "
+        f"étape(s)"
     )
-
+    print(f"Risque      : {conclusion.get('risk_level')}")
+    print(f"Priorité SOC: {conclusion.get('soc_priority')}")
+    print(f"Traçable    : {audit.get('traceable')}")
+    print(f"Vérifiable  : {audit.get('verifiable')}")
     print()
 
-    activated_patterns = patterns_result[
-        "activated_patterns"
-    ]
-
-    for pattern in activated_patterns:
+    for pattern in reasoning_result.get(
+        "activated_patterns",
+        [],
+    ):
         print(
-            f"Motif       : "
-            f"{pattern.get('pattern_id')} "
-            f"→ {pattern.get('name')}"
+            f"Motif       : {pattern.get('pattern_id')} → "
+            f"{pattern.get('name') or pattern.get('pattern_name')}"
         )
 
-    for candidate in mitre_result[
-        "mitre_candidates"
-    ]:
+    for candidate in mitre_result.get(
+        "mitre_candidates",
+        [],
+    ):
         print(
-            f"MITRE       : "
-            f"{candidate.get('technique_id')} "
-            f"→ {candidate.get('technique_name')}"
+            f"MITRE       : {candidate.get('technique_id')} → "
+            f"{candidate.get('technique_name')}"
+        )
+
+    for index, step in enumerate(
+        attack_chain_result.get("attack_chain", []),
+        start=1,
+    ):
+        print(
+            f"Étape {index:<3}  : {step.get('tactic')} → "
+            f"{step.get('technique_id')} "
+            f"({step.get('technique_name')})"
         )
 
     explanation = proof_result.get(
@@ -517,11 +536,28 @@ def print_summary(
     if explanation:
         print()
         print("Explication :")
-        print(f"- {explanation.get('summary')}")
-        print(f"- {explanation.get('behavior')}")
-        print(f"- {explanation.get('mitre')}")
-        print(f"- {explanation.get('evidence')}")
-        print(f"- {explanation.get('caution')}")
+
+        for key in (
+            "summary",
+            "behavior",
+            "mitre",
+            "attack_chain",
+            "evidence",
+            "caution",
+        ):
+            text = explanation.get(key)
+
+            if text:
+                print(f"- {text}")
+
+    recommended_action = conclusion.get(
+        "recommended_action"
+    )
+
+    if recommended_action:
+        print()
+        print("Action recommandée :")
+        print(f"- {recommended_action}")
 
     print()
     print("Fichiers générés :")
@@ -529,16 +565,14 @@ def print_summary(
     for output_name, output_path in pipeline_result[
         "output_paths"
     ].items():
-        print(
-            f"- {output_name}: "
-            f"{output_path.resolve()}"
-        )
+        print(f"- {output_name}: {output_path.resolve()}")
 
 
 def parse_arguments() -> argparse.Namespace:
+    """Définit les arguments de la ligne de commande."""
     parser = argparse.ArgumentParser(
         description=(
-            "Exécute le pipeline explicable complet "
+            "Exécute le pipeline neurosymbolique explicable "
             "à partir d’un fichier XAI/COMAT."
         )
     )
@@ -549,10 +583,9 @@ def parse_arguments() -> argparse.Namespace:
         required=True,
         help=(
             "Chemin du fichier XAI, par exemple "
-            "outputs/comat/input_case_0.json."
+            "outputs/comat/input_probe_01.json."
         ),
     )
-
     parser.add_argument(
         "--case-id",
         type=str,
@@ -567,8 +600,8 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Point d’entrée du script."""
     args = parse_arguments()
-
     input_path = args.input
 
     if not input_path.is_absolute():
@@ -584,7 +617,6 @@ def main() -> None:
         input_path=input_path,
         case_id=case_id,
     )
-
     print_summary(pipeline_result)
 
 

@@ -1,0 +1,39 @@
+{
+  "version": "2.0",
+  "dataset": "nslkdd",
+  "reasoning": {
+    "backend": "python",
+    "fallback_backend": "python",
+    "enable_scallop": true,
+    "enable_attack_chains": true
+  },
+  "mitre": {
+    "source": "stix",
+    "enterprise_attack_path": "data/mitre/enterprise-attack.json",
+    "sample_path": "data/mitre/enterprise-attack-sample.json",
+    "allow_sample_fallback": true,
+    "include_subtechniques": true,
+    "include_deprecated": false
+  },
+  "knowledge_base": {
+    "concepts": "knowledge_base/concepts/nslkdd.json",
+    "actions": "knowledge_base/actions/nslkdd.json",
+    "patterns": "knowledge_base/patterns/nslkdd.json",
+    "scenarios": "knowledge_base/scenarios/nslkdd.json",
+    "mitre_mappings": "knowledge_base/mitre/pattern_mappings.json"
+  },
+  "context": {
+    "enabled": true,
+    "default_asset_criticality": "medium",
+    "use_prediction_confidence": true,
+    "use_shap_evidence": true,
+    "use_asset_context": true
+  },
+  "proof": {
+    "include_observations": true,
+    "include_rules": true,
+    "include_justifications": true,
+    "include_attack_chain": true,
+    "include_reasoning_backend": true
+  }
+}

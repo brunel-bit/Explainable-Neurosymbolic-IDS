@@ -1,0 +1,76 @@
+type SemanticAction = String, String, String, String
+type CandidatePattern = String, String
+type PatternCondition = String, String, String, String, String
+type PatternMatch = String, String, String
+
+rel semantic_action(
+  case_id: String,
+  verb: String,
+  object: String,
+  state: String
+)
+
+rel candidate_pattern(
+  pattern_id: String,
+  pattern_name: String
+)
+
+rel required_condition(
+  pattern_id: String,
+  condition_id: String,
+  verb: String,
+  object: String,
+  state: String
+)
+
+rel supporting_condition(
+  pattern_id: String,
+  condition_id: String,
+  verb: String,
+  object: String,
+  state: String
+)
+
+rel required_match(
+  pattern_id: String,
+  case_id: String,
+  condition_id: String
+)
+
+rel supporting_match(
+  pattern_id: String,
+  case_id: String,
+  condition_id: String
+)
+
+required_match(pattern_id, case_id, condition_id) =
+  candidate_pattern(pattern_id, _),
+  required_condition(
+    pattern_id,
+    condition_id,
+    verb,
+    object,
+    state
+  ),
+  semantic_action(
+    case_id,
+    verb,
+    object,
+    state
+  )
+
+supporting_match(pattern_id, case_id, condition_id) =
+  candidate_pattern(pattern_id, _),
+  supporting_condition(
+    pattern_id,
+    condition_id,
+    verb,
+    object,
+    state
+  ),
+  semantic_action(
+    case_id,
+    verb,
+    object,
+    state
+  )
