@@ -2,7 +2,7 @@
 
 Prototype académique de détection d’intrusions explicable combinant apprentissage automatique, SHAP, transformation sémantique, raisonnement symbolique avec Scallop, MITRE ATT&CK, reconstruction de chaîne d’attaque et génération de preuves explicables.
 
-> Projet de recherche de maîtrise en informatique à l’Université Laval. Ce dépôt est expérimental et n’est pas destiné à un déploiement direct en production.
+> Projet de recherche de maîtrise en informatique à l’Université Laval. Ce dépôt est expérimental et est validé comme un POC et n’est pas destiné à un déploiement direct en production. Je prevois l'ameliorer avec un plus grand jeu de données lors de ma post maitrise et en continuant ma recherche.
 
 ## Objectif
 
